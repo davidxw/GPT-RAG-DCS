@@ -4,7 +4,7 @@ if (Test-Path -Path ".\.azure\gpt-rag-ingestion") {
 }
 
 # Clone the repository into the .azure folder
-git clone -b v1.0.1 https://github.com/Azure/gpt-rag-ingestion .\.azure\gpt-rag-ingestion
+git clone -b main-DCS https://github.com/davidxw/gpt-rag-ingestion-DCS .\.azure\gpt-rag-ingestion
 
 # Delete the gpt-rag-orchestrator folder from .azure if it exists
 if (Test-Path -Path ".\.azure\gpt-rag-orchestrator") {
@@ -12,7 +12,7 @@ if (Test-Path -Path ".\.azure\gpt-rag-orchestrator") {
 }
 
 # Clone the repository into the .azure folder
-git clone -b v1.0.0 https://github.com/Azure/gpt-rag-orchestrator .\.azure\gpt-rag-orchestrator
+git clone -b main-DCS https://github.com/davidxw/gpt-rag-orchestrator-DCS .\.azure\gpt-rag-orchestrator
 
 # Delete the gpt-rag-frontend folder from .azure if it exists
 if (Test-Path -Path ".\.azure\gpt-rag-frontend") {
@@ -20,4 +20,4 @@ if (Test-Path -Path ".\.azure\gpt-rag-frontend") {
 }
 
 # Clone the repository into the .azure folder
-git clone https://github.com/Azure/gpt-rag-frontend .\.azure\gpt-rag-frontend
+git clone -b main-DCS https://github.com/davidxw/gpt-rag-frontend-DCS .\.azure\gpt-rag-frontend
