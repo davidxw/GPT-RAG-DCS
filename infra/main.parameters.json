@@ -101,6 +101,21 @@
       "chatGptModelVersion": {
         "value": "${AZURE_CHAT_GPT_MODEL_VERSION}"
       },
+      "chatGptSmallModelName": {
+        "value": "${AZURE_CHAT_GPT_SMALL_MODEL_NAME}"
+      },
+      "chatGptSmallModelVersion": {
+        "value": "${AZURE_CHAT_GPT_SMALL_MODEL_VERSION}"
+      },
+      "chatGptSmallDeploymentName": {
+        "value": "${AZURE_CHAT_GPT_SMALL_DEPLOYMENT_NAME}"
+      },
+      "chatGptSmallModelDeploymentType": {
+        "value": "${AZURE_CHAT_GPT_SMALL_DEPLOYMENT_TYPE}"
+      },
+      "chatGptSmallDeploymentCapacity": {
+        "value": "${AZURE_CHAT_GPT_SMALL_DEPLOYMENT_CAPACITY}"
+      },
       "embeddingsModelName": {
         "value": "${AZURE_EMBEDDINGS_MODEL_NAME}"
       },

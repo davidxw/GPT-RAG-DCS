@@ -22,6 +22,12 @@ deployOrchestrator=$(echo $AZURE_COMPONENT_CONFIG | grep -o '"deployOrchestrator
 cd $PWD/scripts/rai
 ./raipolicies.sh $tenantId $subscriptionId $resourceGroupName $aoaiResourceName $aoaiModelName "MainRAIpolicy" "MainBlockListPolicy"
 
+# Apply RAI policy to small model deployment
+aoaiSmallModelName="$AZURE_CHAT_GPT_SMALL_DEPLOYMENT_NAME"
+if [ -n "$aoaiSmallModelName" ]; then
+    ./raipolicies.sh $tenantId $subscriptionId $resourceGroupName $aoaiResourceName $aoaiSmallModelName "MainRAIpolicy" "MainBlockListPolicy"
+fi
+
 if [ "$AZURE_ZERO_TRUST" = "FALSE" ]; then
     exit 0
 fi

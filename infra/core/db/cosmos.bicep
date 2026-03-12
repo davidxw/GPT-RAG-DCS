@@ -16,6 +16,8 @@ param deployCosmosDb bool = true
 
 param conversationContainerName string
 param datasourcesContainerName string  
+param semanticCacheContainerName string = 'semantic_cache'
+param embeddingsVectorSize int = 3072
 
 param tags object = {}
 
@@ -86,12 +88,12 @@ var locations = [
   }
 ]
 
-resource existingAccount 'Microsoft.DocumentDB/databaseAccounts@2022-05-15' existing  = if (cosmosDbReuse && deployCosmosDb) {
+resource existingAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' existing  = if (cosmosDbReuse && deployCosmosDb) {
   scope: resourceGroup(existingCosmosDbResourceGroupName)
   name: existingCosmosDbAccountName
 }
 
-resource newAccount 'Microsoft.DocumentDB/databaseAccounts@2022-05-15' = if (!cosmosDbReuse && deployCosmosDb) {
+resource newAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = if (!cosmosDbReuse && deployCosmosDb) {
   name: toLower(accountName)
   kind: 'GlobalDocumentDB'
   location: location
@@ -106,7 +108,7 @@ resource newAccount 'Microsoft.DocumentDB/databaseAccounts@2022-05-15' = if (!co
   }
 }
 
-resource database 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2022-05-15' = if (!cosmosDbReuse && deployCosmosDb) {
+resource database 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-11-15' = if (!cosmosDbReuse && deployCosmosDb) {
   parent: newAccount
   name: databaseName
   properties: {
@@ -116,7 +118,7 @@ resource database 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2022-05-15
   }
 }
 
-resource conversationsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2022-05-15' = if (!cosmosDbReuse && deployCosmosDb) {
+resource conversationsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = if (!cosmosDbReuse && deployCosmosDb) {
   parent: database
   name: conversationContainerName
   properties: {
@@ -147,7 +149,7 @@ resource conversationsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDataba
   }
 }
 
-resource modelsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2022-05-15' = if (!cosmosDbReuse && deployCosmosDb) {
+resource modelsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = if (!cosmosDbReuse && deployCosmosDb) {
   parent: database
   name: datasourcesContainerName
   properties: {
@@ -163,6 +165,61 @@ resource modelsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/con
       indexingPolicy: {
         indexingMode: 'none'
         automatic: false
+      }
+    }
+    options: {
+      autoscaleSettings: {
+        maxThroughput: autoscaleMaxThroughput
+      }
+    }
+  }
+}
+
+resource semanticCacheContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = if (!cosmosDbReuse && deployCosmosDb) {
+  parent: database
+  name: semanticCacheContainerName
+  properties: {
+    resource: {
+      id: semanticCacheContainerName
+      partitionKey: {
+        paths: [
+          '/security_ids'
+        ]
+        kind: 'Hash'
+      }
+      defaultTtl: -1
+      indexingPolicy: {
+        indexingMode: 'consistent'
+        automatic: true
+        includedPaths: [
+          {
+            path: '/*'
+          }
+        ]
+        excludedPaths: [
+          {
+            path: '/question_embedding/*'
+          }
+          {
+            path: '/"_etag"/?'
+          }
+        ]
+        vectorIndexes: [
+          {
+            path: '/question_embedding'
+            type: 'diskANN'
+          }
+        ]
+      }
+      vectorEmbeddingPolicy: {
+        vectorEmbeddings: [
+          {
+            path: '/question_embedding'
+            dataType: 'float32'
+            distanceFunction: 'cosine'
+            dimensions: embeddingsVectorSize
+          }
+        ]
       }
     }
     options: {

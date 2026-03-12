@@ -15,7 +15,7 @@ param secretName string = 'azureSearchKey'
 param keyVaultName string
 
 param authOptions object = {}
-param semanticSearch string = 'free'
+param semanticSearch string = 'standard'
 
 
 resource existingSearch 'Microsoft.Search/searchServices@2021-04-01-preview' existing  = if (aiSearchReuse && deployAiSearch) {

@@ -243,6 +243,7 @@ var _azureDbConfigDefaults = {
   dbDatabaseName: 'db0-${resourceToken}'
   conversationContainerName: 'conversations'
   datasourcesContainerName: 'datasources'
+  semanticCacheContainerName: 'semantic_cache'
 }
 param azureDbConfig object = {} 
 var _azureDbConfig = union(_azureDbConfigDefaults, {
@@ -250,6 +251,7 @@ var _azureDbConfig = union(_azureDbConfigDefaults, {
     dbDatabaseName: (empty(azureDbConfig.dbDatabaseName) ? _azureDbConfigDefaults.dbDatabaseName : azureDbConfig.dbDatabaseName)
     conversationContainerName: (empty(azureDbConfig.conversationContainerName) ? _azureDbConfigDefaults.conversationContainerName : azureDbConfig.conversationContainerName)
     datasourcesContainerName: (empty(azureDbConfig.datasourcesContainerName) ? _azureDbConfigDefaults.datasourcesContainerName : azureDbConfig.datasourcesContainerName)
+    semanticCacheContainerName: (empty(azureDbConfig.semanticCacheContainerName) ? _azureDbConfigDefaults.semanticCacheContainerName : azureDbConfig.semanticCacheContainerName)
 })
 var _cosmosDbResourceGroupName = _azureReuseConfig.cosmosDbReuse ? _azureReuseConfig.existingCosmosDbResourceGroupName : _resourceGroupName
 
@@ -321,6 +323,28 @@ var _chatGptDeploymentName = !empty(chatGptDeploymentName) ? chatGptDeploymentNa
 // @maxValue(300)
 param chatGptDeploymentCapacity int = 0
 var _chatGptDeploymentCapacity = chatGptDeploymentCapacity != 0 ? chatGptDeploymentCapacity : 40
+
+// Azure OpenAI Small model settings
+
+@description('Small GPT model used as a secondary/lightweight model. Don\'t forget to check region availability.')
+param chatGptSmallModelName string = ''
+var _chatGptSmallModelName = !empty(chatGptSmallModelName) ? chatGptSmallModelName : 'gpt-4o-mini'
+
+@description('Small GPT model deployment type.')
+param chatGptSmallModelDeploymentType string = ''
+var _chatGptSmallModelDeploymentType = !empty(chatGptSmallModelDeploymentType) ? chatGptSmallModelDeploymentType : 'GlobalStandard'
+
+@description('Small GPT model version.')
+param chatGptSmallModelVersion string = ''
+var _chatGptSmallModelVersion = !empty(chatGptSmallModelVersion) ? chatGptSmallModelVersion : '2024-07-18'
+
+@description('Small GPT model deployment name.')
+param chatGptSmallDeploymentName string = ''
+var _chatGptSmallDeploymentName = !empty(chatGptSmallDeploymentName) ? chatGptSmallDeploymentName : 'chat-small'
+
+@description('Small GPT model tokens per Minute Rate Limit (thousands).')
+param chatGptSmallDeploymentCapacity int = 0
+var _chatGptSmallDeploymentCapacity = chatGptSmallDeploymentCapacity != 0 ? chatGptSmallDeploymentCapacity : 40
 
 @description('Embeddings model used to generate vector embeddings. Don\'t forget to check region availability.')
 // @allowed([ 'text-embedding-ada-002', 'text-embedding-3-small', 'text-embedding-3-large' ])
@@ -714,7 +738,9 @@ module cosmosAccount './core/db/cosmos.bicep' = {
     publicNetworkAccess: _networkIsolation?'Disabled':'Enabled'
     location: location
     conversationContainerName:  _azureDbConfig.conversationContainerName
-    datasourcesContainerName: _azureDbConfig.datasourcesContainerName   
+    datasourcesContainerName: _azureDbConfig.datasourcesContainerName
+    semanticCacheContainerName: _azureDbConfig.semanticCacheContainerName
+    embeddingsVectorSize: _embeddingsVectorSize
     databaseName: _azureDbConfig.dbDatabaseName
     tags: tags
     secretName: 'azureDBkey'
@@ -845,6 +871,10 @@ module orchestrator './core/host/functions.bicep' =  {
         value: _azureDbConfig.datasourcesContainerName
       }
       {
+        name: 'AZURE_DB_SEMANTIC_CACHE_CONTAINER_NAME'
+        value: _azureDbConfig.semanticCacheContainerName
+      }
+      {
         name: 'AZURE_KEY_VAULT_NAME'
         value: keyVault.outputs.name
       }
@@ -879,6 +909,14 @@ module orchestrator './core/host/functions.bicep' =  {
       {
         name: 'AZURE_OPENAI_CHATGPT_DEPLOYMENT'
         value: _chatGptDeploymentName
+      }
+      {
+        name: 'AZURE_OPENAI_CHATGPT_SMALL_MODEL'
+        value: _chatGptSmallModelName
+      }
+      {
+        name: 'AZURE_OPENAI_CHATGPT_SMALL_DEPLOYMENT'
+        value: _chatGptSmallDeploymentName
       }
       {
         name: 'AZURE_OPENAI_API_VERSION'
@@ -1260,6 +1298,14 @@ module dataIngestion './core/host/functions.bicep' = {
         value: _chatGptDeploymentName
       }
       {
+        name: 'AZURE_OPENAI_CHATGPT_SMALL_MODEL'
+        value: _chatGptSmallModelName
+      }
+      {
+        name: 'AZURE_OPENAI_CHATGPT_SMALL_DEPLOYMENT'
+        value: _chatGptSmallDeploymentName
+      }
+      {
         name: 'NUM_TOKENS'
         value: _chunkNumTokens
       }
@@ -1484,7 +1530,19 @@ module openAi 'core/ai/aiservices.bicep' = {
           name: _embeddingsDeploymentType
           capacity: _embeddingsDeploymentCapacity
         }
-      }      
+      }
+      {
+        name: _chatGptSmallDeploymentName
+        model: {
+          format: 'OpenAI'
+          name: _chatGptSmallModelName
+          version: _chatGptSmallModelVersion
+        }
+        sku: {
+          name: _chatGptSmallModelDeploymentType
+          capacity: _chatGptSmallDeploymentCapacity
+        }
+      }
     ]
   }
 }
@@ -1678,6 +1736,10 @@ output AZURE_CHAT_GPT_DEPLOYMENT_CAPACITY int = _chatGptDeploymentCapacity
 output AZURE_CHAT_GPT_DEPLOYMENT_NAME string = _chatGptDeploymentName
 output AZURE_CHAT_GPT_MODEL_NAME string = _chatGptModelName
 output AZURE_CHAT_GPT_MODEL_VERSION string = _chatGptModelVersion
+output AZURE_CHAT_GPT_SMALL_DEPLOYMENT_NAME string = _chatGptSmallDeploymentName
+output AZURE_CHAT_GPT_SMALL_MODEL_NAME string = _chatGptSmallModelName
+output AZURE_CHAT_GPT_SMALL_MODEL_VERSION string = _chatGptSmallModelVersion
+output AZURE_CHAT_GPT_SMALL_DEPLOYMENT_CAPACITY int = _chatGptSmallDeploymentCapacity
 output AZURE_EMBEDDINGS_MODEL_NAME string = _embeddingsModelName
 output AZURE_EMBEDDINGS_VERSION string = _embeddingsModelVersion
 output AZURE_EMBEDDINGS_DEPLOYMENT_NAME string = _embeddingsDeploymentName
@@ -1690,7 +1752,7 @@ output AZURE_DATA_INGEST_FUNC_RG string = _resourceGroupName
 output AZURE_DATA_INGESTION_PE string = _azureDataIngestionPe
 output AZURE_DATABASE_SUBNET_NAME string = _databaseSubnetName
 output AZURE_DATABASE_SUBNET_PREFIX string = _databaseSubnetPrefix
-output AZURE_DB_CONFIG object = azureDbConfig
+output AZURE_DB_CONFIG object = _azureDbConfig
 output AZURE_FRONTEND_PE string = _azureFrontendPe
 output AZURE_KV_NAME string = _keyVaultName
 output AZURE_KEY_VAULT_NAME string = _keyVaultName
@@ -1718,10 +1780,11 @@ output AZURE_STORAGE_CONTAINER_NAME string = _storageContainerName
 output AZURE_SUBSCRIPTION_ID string = subscription().subscriptionId
 output AZURE_TENANT_ID string = tenant().tenantId
 output AZURE_USE_SEMANTIC_RERANKING bool = _useSemanticReranking
-output AZURE_VM_DEPLOY_VM bool = _deployVM
-output AZURE_VM_KV_SEC_NAME string = _networkIsolation ? _vmKeyVaultSecName : ''
-output AZURE_VM_NAME string = _networkIsolation ? _ztVmName : ''
-output AZURE_VM_USER_NAME string = _networkIsolation ? _vmUserName : ''
+// commenting out to keep the number of outputs under 64
+// output AZURE_VM_DEPLOY_VM bool = _deployVM
+// output AZURE_VM_KV_SEC_NAME string = _networkIsolation ? _vmKeyVaultSecName : ''
+// output AZURE_VM_NAME string = _networkIsolation ? _ztVmName : ''
+// output AZURE_VM_USER_NAME string = _networkIsolation ? _vmUserName : ''
 output AZURE_VNET_ADDRESS string = _vnetAddress
 output AZURE_VNET_NAME string = _vnetName
 output AZURE_ZERO_TRUST string = _networkIsolation ? 'TRUE' : 'FALSE'
