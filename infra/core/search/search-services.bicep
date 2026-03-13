@@ -17,6 +17,8 @@ param keyVaultName string
 param authOptions object = {}
 param semanticSearch string = 'standard'
 
+param disableLocalAuth bool = false
+
 
 resource existingSearch 'Microsoft.Search/searchServices@2021-04-01-preview' existing  = if (aiSearchReuse && deployAiSearch) {
   scope: resourceGroup(existingAiSearchResourceGroupName)
@@ -32,7 +34,7 @@ resource newSearch 'Microsoft.Search/searchServices@2021-04-01-preview' = if (!a
   }
   properties: {
     authOptions: authOptions
-    disableLocalAuth: false
+    disableLocalAuth: disableLocalAuth
     disabledDataExfiltrationOptions: []
     encryptionWithCmk: {
       enforcement: 'Unspecified'
@@ -54,7 +56,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2022-07-01' existing = {
   name: keyVaultName
 }
 
-resource keyVaultSecret 'Microsoft.KeyVault/vaults/secrets@2022-07-01' =  {
+resource keyVaultSecret 'Microsoft.KeyVault/vaults/secrets@2022-07-01' = if (!disableLocalAuth) {
   name: secretName
   tags: tags
   parent: keyVault

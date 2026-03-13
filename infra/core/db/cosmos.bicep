@@ -13,6 +13,7 @@ param existingCosmosDbAccountName string
 
 param deployCosmosDb bool = true
 
+param disableLocalAuth bool = false
 
 param conversationContainerName string
 param datasourcesContainerName string  
@@ -100,11 +101,17 @@ resource newAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = if (!co
   tags: tags
   properties: {
     consistencyPolicy: consistencyPolicy[defaultConsistencyLevel]
+    disableLocalAuth: disableLocalAuth
     locations: locations
     databaseAccountOfferType: 'Standard'
     enableAutomaticFailover: systemManagedFailover
     publicNetworkAccess: publicNetworkAccess
     enableAnalyticalStorage: true
+      capabilities: [
+          {
+              name: 'EnableNoSQLVectorSearch'
+          }
+      ]
   }
 }
 
@@ -234,7 +241,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2022-07-01' existing = {
   name: keyVaultName
 }
 
-resource keyVaultSecret 'Microsoft.KeyVault/vaults/secrets@2022-07-01' =  {
+resource keyVaultSecret 'Microsoft.KeyVault/vaults/secrets@2022-07-01' = if (!disableLocalAuth) {
   name: secretName
   tags: tags
   parent: keyVault

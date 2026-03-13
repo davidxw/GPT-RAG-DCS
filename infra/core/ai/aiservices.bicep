@@ -6,6 +6,8 @@ param existingAiServicesResourceGroupName string
 
 param aiServicesDeploy bool = true
 
+param disableLocalAuth bool = false
+
 param secretsNames object = {}
 param keyVaultName string
 
@@ -30,6 +32,7 @@ resource newAccount 'Microsoft.CognitiveServices/accounts@2024-10-01' = if (!aiS
   properties: {
     customSubDomainName: customSubDomainName
     publicNetworkAccess: publicNetworkAccess
+    disableLocalAuth: disableLocalAuth
   }
   sku: sku
 }
@@ -52,7 +55,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2022-07-01' existing = {
   name: keyVaultName
 }
 
-resource keyVaultSecret 'Microsoft.KeyVault/vaults/secrets@2022-07-01' =  [for secretName in items(secretsNames): {
+resource keyVaultSecret 'Microsoft.KeyVault/vaults/secrets@2022-07-01' =  [for secretName in items(secretsNames) : if (!disableLocalAuth) {
   name: secretName.value
   tags: tags
   parent: keyVault

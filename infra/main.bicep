@@ -177,6 +177,10 @@ var _vmUserName = !empty(vmUserName) ? vmUserName : 'gptrag'
 @description('Id of the user or app to assign application roles')
 param principalId string = ''
 
+@description('Disable local authentication and use only Azure AD for authentication for cosmos, OpenAI services and search. This is recommended for production deployments but requires additional configuration. Default is false.')
+param disableLocalAuth bool = false
+var _disableLocalAuth = disableLocalAuth
+
 // Network settings
 
 @description('Network isolation? If yes it will create the private endpoints.')
@@ -233,6 +237,9 @@ var _databaseSubnetName = !empty(databaseSubnetName) ? databaseSubnetName : 'dat
 param databaseSubnetPrefix string = ''
 var _databaseSubnetPrefix = !empty(databaseSubnetPrefix) ? databaseSubnetPrefix : '10.0.1.0/26'
 
+@description('Flag to undicate if the UI testing tool is enabled. True by default')
+param useTester bool = true
+
 // flag that indicates if we're reusing a vnet
 var _vnetReuse = _azureReuseConfig.vnetReuse
 
@@ -251,7 +258,7 @@ var _azureDbConfig = union(_azureDbConfigDefaults, {
     dbDatabaseName: (empty(azureDbConfig.dbDatabaseName) ? _azureDbConfigDefaults.dbDatabaseName : azureDbConfig.dbDatabaseName)
     conversationContainerName: (empty(azureDbConfig.conversationContainerName) ? _azureDbConfigDefaults.conversationContainerName : azureDbConfig.conversationContainerName)
     datasourcesContainerName: (empty(azureDbConfig.datasourcesContainerName) ? _azureDbConfigDefaults.datasourcesContainerName : azureDbConfig.datasourcesContainerName)
-    semanticCacheContainerName: (empty(azureDbConfig.semanticCacheContainerName) ? _azureDbConfigDefaults.semanticCacheContainerName : azureDbConfig.semanticCacheContainerName)
+    semanticCacheContainerName: (contains(azureDbConfig, 'semanticCacheContainerName') && !empty(azureDbConfig.semanticCacheContainerName) ? azureDbConfig.semanticCacheContainerName : _azureDbConfigDefaults.semanticCacheContainerName)
 })
 var _cosmosDbResourceGroupName = _azureReuseConfig.cosmosDbReuse ? _azureReuseConfig.existingCosmosDbResourceGroupName : _resourceGroupName
 
@@ -745,6 +752,7 @@ module cosmosAccount './core/db/cosmos.bicep' = {
     tags: tags
     secretName: 'azureDBkey'
     keyVaultName: keyVault.outputs.name    
+    disableLocalAuth: _disableLocalAuth
   }
 }
 
@@ -1134,7 +1142,11 @@ module frontEnd  'core/host/appservice.bicep' = {
       {
         name: 'LOGLEVEL'
         value: 'INFO'
-      } 
+      }
+      {
+        name: 'ENABLE_TESTER'
+        value: useTester ? 'true' : 'false'
+      }
     ]
   }
 }
@@ -1456,6 +1468,7 @@ module aiServices 'core/ai/aiservices.bicep' = {
   params: {
     name: _aiServicesName
     location: location
+    disableLocalAuth: _disableLocalAuth
     aiServicesDeploy: true
     aiServicesReuse : _azureReuseConfig.aiServicesReuse
     existingAiServicesResourceGroupName : _azureReuseConfig.existingAiServicesResourceGroupName
@@ -1498,6 +1511,7 @@ module openAi 'core/ai/aiservices.bicep' = {
     aiServicesReuse : _azureReuseConfig.aoaiReuse
     existingAiServicesResourceGroupName : _azureReuseConfig.existingAoaiResourceGroupName
     publicNetworkAccess: _networkIsolation?'Disabled':'Enabled'
+    disableLocalAuth: _disableLocalAuth
     tags: tags
     sku: {
       name: 'S0' 
@@ -1575,6 +1589,7 @@ module searchService 'core/search/search-services.bicep' = {
     keyVaultName: keyVault.outputs.name
     publicNetworkAccess: _networkIsolation?'Disabled':'Enabled'
     tags: tags
+    disableLocalAuth: _disableLocalAuth
     authOptions: {
       aadOrApiKey: {
         aadAuthFailureMode: 'http401WithBearerChallenge'
