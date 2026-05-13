@@ -106,12 +106,12 @@ resource newAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = if (!co
     databaseAccountOfferType: 'Standard'
     enableAutomaticFailover: systemManagedFailover
     publicNetworkAccess: publicNetworkAccess
-    enableAnalyticalStorage: true
-      capabilities: [
-          {
-              name: 'EnableNoSQLVectorSearch'
-          }
-      ]
+    // enableAnalyticalStorage: true
+    capabilities: [
+        {
+            name: 'EnableNoSQLVectorSearch'
+        }
+    ]
   }
 }
 
@@ -137,7 +137,7 @@ resource conversationsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDataba
         ]
         kind: 'Hash'
       }
-      analyticalStorageTtl: analyticalStoreTTL
+      //analyticalStorageTtl: analyticalStoreTTL
       indexingPolicy: {
         indexingMode: 'consistent'
         includedPaths: [
@@ -168,7 +168,7 @@ resource modelsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/con
         ]
         kind: 'Hash'
       }
-      analyticalStorageTtl: analyticalStoreTTL
+      //analyticalStorageTtl: analyticalStoreTTL
       indexingPolicy: {
         indexingMode: 'none'
         automatic: false
