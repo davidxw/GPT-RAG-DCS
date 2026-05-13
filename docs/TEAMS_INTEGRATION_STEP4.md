@@ -1,35 +1,58 @@
 # Guide for Building a Teams App Interface for Enterprise GPT-RAG Solution Accelerator
 
-*Ensure all steps mentioned in [Step 3](TEAMS_INTEGRATION_STEP3.md) are completed before proceeding with the steps below.*
+*Ensure all steps in [Step 3](TEAMS_INTEGRATION_STEP3.md) are completed before proceeding.*
 
-## Step 4: Build the Teams App
+## Step 4: Build the Teams app package
 
-1. Select the **Teams Toolkit** icon in the sidebar. Select **Utility** and then, **Zip Teams App Package**.
+The Teams app package is a `.zip` containing the manifest, icons, and (optionally) localization resources. It is what users sideload, and what you submit to the Developer Portal.
 
-![Zip Teams App Package](../media/teams-guide-Step4a.png)
+### 4.1 Confirm the manifest is up to date
 
-2. Select the Teams Manifest JSON file.
+Before zipping, open `appPackage/manifest.json` and verify:
 
-![Manifest file selection](../media/teams-guide-Step4b.png)
+- `"manifestVersion": "1.19"` (or later). v1.19+ is required for the `bots[].supportsStreaming`, `supportsAIGeneratedContent`, citation entities, and the feedback loop that [Step 6](TEAMS_INTEGRATION_STEP6.md) enables.
+- The bot's `botId` matches the Entra ID app registration created during provisioning.
+- `scopes` includes the surfaces you want — `personal` (1:1 chat), `team`, and/or `groupChat`.
+- For Custom Engine Agent reach into Microsoft 365 Copilot Chat, the `copilotAgents` section is present.
 
-3. Choose the environment. The Teams Toolkit supports running and testing your app in different deployment targets such as development, staging, production, or locally. It utilizes environment files to handle configurations and automate resource provisioning for various environments. Learn more about environments [here](https://learn.microsoft.com/en-us/microsoftteams/platform/toolkit/teamsfx-multi-env).
+### 4.2 Zip the package
 
-![Teams Toolkit environment selection](../media/teams-guide-Step4c.png)
+1. Open the **Microsoft 365 Agents Toolkit** sidebar.
+2. Choose **Utility → Zip Teams App Package**.
 
-4. Wait for the build to complete. Once finished, navigate to the folder. You can click on the **local address** link to go directly to the folder.
+   ![Zip Teams App Package](../media/teams-guide-Step4a.png)
 
-![Local Address link](../media/teams-guide-Step4d.png)
+3. Select the **manifest JSON** file (`appPackage/manifest.json`).
 
-5. Review the files generated in the folder. These files will be used for deployment in the subsequent section.
+   ![Manifest file selection](../media/teams-guide-Step4b.png)
 
-![Teams App Files](../media/teams-guide-Step4e.png)
+4. Choose the **environment** (`local`, `dev`, `prod`, …). The toolkit substitutes environment-specific values (bot id, endpoint URLs) into the manifest at this point. See [Environments in the M365 Agents Toolkit](https://learn.microsoft.com/microsoftteams/platform/toolkit/teamsfx-multi-env).
 
-Proceed to Step 5: [Publish the Teams App](TEAMS_INTEGRATION_STEP5.md).
+   ![Environment selection](../media/teams-guide-Step4c.png)
+
+5. Wait for the build to complete. The output `.zip` is written to `appPackage/build/appPackage.<env>.zip`.
+
+   ![Local Address link](../media/teams-guide-Step4d.png)
+
+6. Inspect the build output. You should see the zip alongside the rendered `manifest.<env>.json` — review that file to confirm the substituted bot id and endpoint look correct before publishing.
+
+   ![Teams App Files](../media/teams-guide-Step4e.png)
+
+### 4.3 Validate (optional but recommended)
+
+Run the Teams App validator before publishing — either via **Utility → Validate Application → Validate using App Validation Tool** in the toolkit, or via the [App validation page in the Developer Portal](https://dev.teams.microsoft.com/validation). It catches manifest issues that the toolkit does not (icon contrast, missing privacy URL, oversized descriptions, etc.).
+
+---
+
+Proceed to [Step 5: Publish the Teams app](TEAMS_INTEGRATION_STEP5.md).
 
 ## Additional Resources
-- [Step 3: Provision and Deploy the Azure resources for the Teams App](TEAMS_INTEGRATION_STEP3.md).
-- [Step 5: Publish the Teams App](TEAMS_INTEGRATION_STEP5.md).
+- [Step 3: Provision and deploy Azure resources](TEAMS_INTEGRATION_STEP3.md).
+- [Step 5: Publish the Teams app](TEAMS_INTEGRATION_STEP5.md).
+- [Step 6: Add rich RAG UX](TEAMS_INTEGRATION_STEP6.md).
 
 ## External Resources
-- [Teams app package](https://learn.microsoft.com/en-us/microsoftteams/platform/concepts/build-and-test/apps-package).
-- [Environments in Microsoft Teams Toolkit](https://learn.microsoft.com/en-us/microsoftteams/platform/toolkit/teamsfx-multi-env).
+- [Teams app package](https://learn.microsoft.com/microsoftteams/platform/concepts/build-and-test/apps-package).
+- [App manifest schema reference (v1.19+)](https://learn.microsoft.com/microsoftteams/platform/resources/schema/manifest-schema).
+- [Environments in the Microsoft 365 Agents Toolkit](https://learn.microsoft.com/microsoftteams/platform/toolkit/teamsfx-multi-env).
+- [App validation in the Developer Portal](https://dev.teams.microsoft.com/validation).

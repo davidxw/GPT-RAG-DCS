@@ -2,6 +2,42 @@
 
 This section explains how to configure SharePoint as a data source for the `ragindex` GPT-RAG Azure AI Search Index, using the `Sites.Selected` permission to limit access to specific site collections.
 
+> [!IMPORTANT]
+> **Tested ingestor version.** This fork (GPT-RAG-DCS) currently pins the ingestion Function App to
+> [`Azure/gpt-rag-ingestion` `release/1.0.1`](https://github.com/Azure/gpt-rag-ingestion/tree/release/1.0.1).
+> The behaviour described below &mdash; environment variables, schedule, supported formats, ACL handling,
+> and known limits &mdash; reflects that branch. Newer upstream releases (e.g. `main`/v2.x) change
+> the connector substantially and may not match this guide.
+
+## How the SharePoint connector works (1.0.1)
+
+The connector is built on a **pull-from-SharePoint, push-to-Search** model:
+
+- **Pull from SharePoint** &mdash; two timer-triggered Python Azure Functions inside the GPT-RAG
+  ingestion Function App poll Microsoft Graph on a schedule. SharePoint itself does not push events
+  to GPT-RAG (no webhook, no change-notification subscription, no Azure AI Search built-in
+  SharePoint indexer); discovery happens entirely via outbound Graph calls from the Function App.
+- **Push to Azure AI Search** &mdash; once a file is downloaded and chunked, the Function App
+  upserts the chunks + embeddings directly into the `ragindex` Azure AI Search index. The Search
+  service is never given direct access to SharePoint.
+
+The two functions are:
+
+| Function | Purpose | Trigger (per [`function_app.py`](https://github.com/Azure/gpt-rag-ingestion/blob/release/1.0.1/function_app.py) on `release/1.0.1`) |
+|---|---|---|
+| `sharepoint_index_files` | List files in the configured site/folder via Graph, decide which need (re-)indexing (by comparing `metadata_storage_last_modified`), download, chunk, embed, and upsert into `ragindex`. | Timer trigger. |
+| `sharepoint_purge_deleted_files` | Walk the index, ask Graph whether each indexed SharePoint file still exists, and delete index entries for files that no longer do. | `schedule="0 */60 * * * *"` &mdash; every 60&nbsp;minutes. |
+
+> [!NOTE]
+> The upstream README sometimes describes both functions as running every 10&nbsp;minutes. On the
+> `release/1.0.1` branch the purger's CRON expression is actually every 60&nbsp;minutes &mdash; verify
+> the schedule in `function_app.py` for the version you have deployed, and override via Function App
+> application settings if you need a different cadence.
+
+Both functions are gated by `SHAREPOINT_CONNECTOR_ENABLED=true`. Both target the **single**
+site + folder + file-format set defined by the `SHAREPOINT_*` environment variables below &mdash;
+1.0.1 does not support multiple sites or folders from one Function App.
+
 ### Prerequisites  
 
 Before executing this procedure ensure you have the necessary roles for each step:  
@@ -228,6 +264,10 @@ Before executing this procedure ensure you have the necessary roles for each ste
   >[!NOTE]
   > Leave `SHAREPOINT_FILES_FORMAT` empty to include the following default extensions: vtt, xlsx, xls, pdf, png, jpeg, jpg, bmp, tiff, docx, pptx.
 
+  > [!TIP]
+  > The target index name defaults to `ragindex`. If your deployment uses a different index, set
+  > `AZURE_SEARCH_SHAREPOINT_INDEX_NAME` on the Function App as well.
+
    - **Save and Restart**:
 
      - Click **Save** to apply the changes.
@@ -236,6 +276,47 @@ Before executing this procedure ensure you have the necessary roles for each ste
 
 > [!NOTE] 
 > Done! You have completed the SharePoint configuration procedure.
+
+## Known limits and operational notes (1.0.1)
+
+Keep these in mind when sizing a SharePoint deployment against the pinned 1.0.1 ingestor. None
+of them block normal use of small/medium document libraries, but they materially affect large or
+active ones.
+
+- **Single site / single folder per Function App.** The `SHAREPOINT_*` settings target one
+  site + one folder. To index multiple sites or multiple top-level folders, either deploy
+  additional Function Apps or wait for an upstream connector that supports a list of sources.
+- **Microsoft Graph paging is not implemented.** `sharepoint_files_indexer` reads only the first
+  page of `GET /drives/{id}/root/children` (Graph default ~200 items). Document libraries with
+  more than one page of matching files will silently have items beyond page&nbsp;1 omitted from
+  the index. Workarounds: partition into sub-folders below the configured root, or run separate
+  Function Apps per sub-folder.
+- **Moves and renames can produce duplicate index entries.** 1.0.1 keys index entries by the
+  SharePoint item ID and the purger checks per-item existence rather than using Graph delta
+  query. A file that is moved or renamed inside the indexed folder may appear under both old
+  and new identities until the purger removes the stale entry.
+- **No Graph 429 / `Retry-After` handling.** Large initial loads or rapid re-indexes can hit
+  Microsoft Graph throttling. If you see ingestion stalls, look in the Function App logs for HTTP
+  429 responses from `graph.microsoft.com` and consider lowering the cadence, narrowing
+  `SHAREPOINT_FILES_FORMAT`, or partitioning by folder.
+- **ACLs are partially captured, not fully trimmed end-to-end.** The connector reads each
+  file's read-permission users and groups via Graph and writes them to the
+  `metadata_security_id` field of every chunk (users from `grantedToIdentitiesV2` /
+  `grantedToIdentities`, groups from `grantedToV2.siteGroup.displayName`). Two caveats:
+  - Only the **file's own** permissions are read &mdash; permissions inherited from the
+    parent folder or site are not walked.
+  - Whether queries actually filter on `metadata_security_id` at runtime is a property of the
+    **orchestrator**, not the ingestor. Verify in the orchestrator before relying on per-user
+    security trimming for SharePoint content.
+- **Function timeout requires Premium/Dedicated.** The ingestion Function App's `host.json`
+  sets `functionTimeout: 01:00:00`, which exceeds the 10-minute Consumption-plan ceiling. The
+  Function App must run on a Premium or App Service (Dedicated) plan.
+- **Client secret rotation.** Auth uses the application client secret stored in the GPT-RAG
+  Key Vault as `sharepointClientSecret` (or whatever `SHAREPOINT_CLIENT_SECRET_NAME` points to).
+  Track the expiry you chose in step 4 above and rotate the Key Vault secret value before it
+  expires &mdash; ingestion will start failing with `AADSTS7000222`-style errors otherwise.
+  Federated identity credentials on the Function App's managed identity would remove this
+  rotation entirely, but are not implemented in the 1.0.1 connector.
 
 ## Validation
 

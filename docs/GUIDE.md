@@ -1052,7 +1052,7 @@ To enable GPT-RAG to use multimodal capabilities, such as those provided by GPT-
 
 ## SharePoint Setup
 
-The SharePoint connector indexes and purges files using scheduled Azure Functions to maintain an up-to-date Azure AI Search Index. For more information on how this works, see the Sharepoint section on the [Data Ingestion Page](https://github.com/Azure/gpt-rag-ingestion?tab=readme-ov-file#sharepoint-indexing). For detailed instructions on setting up SharePoint for data ingestion, please refer to the [SharePoint Setup Guide](INGESTION_SHAREPOINT_SETUP.md).
+The SharePoint connector indexes and purges files using scheduled Azure Functions to maintain an up-to-date Azure AI Search Index. The model is **pull-from-SharePoint, push-to-Search** &mdash; the ingestion Function App polls Microsoft Graph on a timer and upserts chunks directly into the `ragindex` Azure AI Search index (the Search service itself is never given access to SharePoint). This fork is pinned to [`gpt-rag-ingestion` `release/1.0.1`](https://github.com/Azure/gpt-rag-ingestion/tree/release/1.0.1); the [SharePoint Setup Guide](INGESTION_SHAREPOINT_SETUP.md) documents the matching environment variables, schedule, ACL handling (`metadata_security_id`), and known limits (single site/folder per Function App, no Graph paging beyond ~200 items per folder, secret-based auth). For background on the upstream connector, see the SharePoint section on the [Data Ingestion Page](https://github.com/Azure/gpt-rag-ingestion?tab=readme-ov-file#sharepoint-indexing).
 
 ## Speech Avatar Integration
 
