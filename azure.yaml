@@ -6,7 +6,7 @@ metadata:
 services:
   dataIngest:
     # project is temporally pulled fro its repo during deployment.
-    project: ./.azure/gpt-rag-ingestion
+    project: ../gpt-rag-ingestion
     language: python
     host: function
     hooks:
@@ -20,12 +20,12 @@ services:
           run: scripts/postdeploy.ps1
           interactive: true
   orchestrator:
-    project: ./.azure/gpt-rag-orchestrator
+    project: ../gpt-rag-orchestrator
     language: python
     host: function
   frontend:
     # backend is python and frontend is Vite app. The frontend is built with Vite settings to output into the backend's static folder.
-    project: ./.azure/gpt-rag-frontend/backend
+    project: ../gpt-rag-frontend/backend
     language: python
     host: appservice
     hooks:

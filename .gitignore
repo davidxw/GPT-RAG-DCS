@@ -7,4 +7,5 @@ results/
 **service_connection.json
 *.pyc
 __pycache__/
-.research/
+
+.research
