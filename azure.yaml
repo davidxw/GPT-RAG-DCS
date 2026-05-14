@@ -14,11 +14,13 @@ services:
     hooks:
       postdeploy:
         posix:
-          # this path is relative to ./.azure/gpt-rag-ingestion
+          shell: sh
+          workingDir: ../gpt-rag-ingestion-DCS
           run: scripts/postdeploy.sh
           interactive: true
         windows:
-          # this path is relative to ./.azure/gpt-rag-ingestion
+          shell: pwsh
+          workingDir: ../gpt-rag-ingestion-DCS
           run: scripts/postdeploy.ps1
           interactive: true
   orchestrator:

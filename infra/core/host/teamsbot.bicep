@@ -82,6 +82,10 @@ resource webApp 'Microsoft.Web/sites@2022-09-01' = {
             value: identity.properties.clientId
           }
           {
+            name: 'AZURE_CLIENT_ID'
+            value: identity.properties.clientId
+          }
+          {
             name: 'TENANT_ID'
             value: identity.properties.tenantId
           }

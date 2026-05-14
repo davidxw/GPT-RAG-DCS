@@ -1216,6 +1216,20 @@ module teamsBot './core/host/teamsbot.bicep' = {
     vnetName: (_networkIsolation && !_vnetReuse) ? vnet.outputs.name : ''
     subnetId: (_networkIsolation && !_vnetReuse) ? vnet.outputs.appIntSubId : ''
     basicPublishingCredentials: _networkIsolation ? true : false
+    appSettings: [
+      {
+        name: 'AZURE_SUBSCRIPTION_ID'
+        value: subscription().subscriptionId
+      }
+      {
+        name: 'AZURE_RESOURCE_GROUP_NAME'
+        value: _resourceGroupName
+      }
+      {
+        name: 'AZURE_ORCHESTRATOR_FUNC_NAME'
+        value: _orchestratorFunctionAppName
+      }
+    ]
   }
 }
 
@@ -1239,6 +1253,16 @@ module teamsBotStorageAccountAccess './core/security/blobstorage-reader-access.b
   scope: az.resourceGroup(_storageAccountResourceGroupName)
   params: {
     resourceName: storage.outputs.name
+    principalId: teamsBot.outputs.identityPrincipalId
+  }
+}
+
+// Grant the Teams bot UMI Contributor on the orchestrator Function App.
+module teamsBotOrchestratorAccess './core/security/functions-access.bicep' = {
+  name: 'teamsbot-function-access'
+  scope: az.resourceGroup(_orchestratorFunctionAppResourceGroupName)
+  params: {
+    resourceName: orchestrator.outputs.name
     principalId: teamsBot.outputs.identityPrincipalId
   }
 }
