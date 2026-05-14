@@ -17,7 +17,9 @@ param disableLocalAuth bool = false
 
 param conversationContainerName string
 param datasourcesContainerName string  
-param semanticCacheContainerName string = 'semantic_cache'
+param semanticCacheContainerName string
+param modelsContainerName string
+param feedbackContainerName string
 param embeddingsVectorSize int = 3072
 
 param tags object = {}
@@ -156,12 +158,64 @@ resource conversationsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDataba
   }
 }
 
-resource modelsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = if (!cosmosDbReuse && deployCosmosDb) {
+resource dataSourcesContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = if (!cosmosDbReuse && deployCosmosDb) {
   parent: database
   name: datasourcesContainerName
   properties: {
     resource: {
       id: datasourcesContainerName
+      partitionKey: {
+        paths: [
+          '/id'
+        ]
+        kind: 'Hash'
+      }
+      //analyticalStorageTtl: analyticalStoreTTL
+      indexingPolicy: {
+        indexingMode: 'none'
+        automatic: false
+      }
+    }
+    options: {
+      autoscaleSettings: {
+        maxThroughput: autoscaleMaxThroughput
+      }
+    }
+  }
+}
+
+resource feedbackContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = if (!cosmosDbReuse && deployCosmosDb) {
+  parent: database
+  name: feedbackContainerName
+  properties: {
+    resource: {
+      id: feedbackContainerName
+      partitionKey: {
+        paths: [
+          '/id'
+        ]
+        kind: 'Hash'
+      }
+      //analyticalStorageTtl: analyticalStoreTTL
+      indexingPolicy: {
+        indexingMode: 'none'
+        automatic: false
+      }
+    }
+    options: {
+      autoscaleSettings: {
+        maxThroughput: autoscaleMaxThroughput
+      }
+    }
+  }
+}
+
+resource modelsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = if (!cosmosDbReuse && deployCosmosDb) {
+  parent: database
+  name: modelsContainerName
+  properties: {
+    resource: {
+      id: modelsContainerName
       partitionKey: {
         paths: [
           '/id'

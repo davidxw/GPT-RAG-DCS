@@ -245,6 +245,8 @@ var _azureDbConfigDefaults = {
   conversationContainerName: 'conversations'
   datasourcesContainerName: 'datasources'
   semanticCacheContainerName: 'semantic_cache'
+  modelsContainerName: 'models'
+  feedbackContainerName: 'feedback'
 }
 param azureDbConfig object = {} 
 var _azureDbConfig = union(_azureDbConfigDefaults, {
@@ -253,7 +255,10 @@ var _azureDbConfig = union(_azureDbConfigDefaults, {
     conversationContainerName: (empty(azureDbConfig.conversationContainerName) ? _azureDbConfigDefaults.conversationContainerName : azureDbConfig.conversationContainerName)
     datasourcesContainerName: (empty(azureDbConfig.datasourcesContainerName) ? _azureDbConfigDefaults.datasourcesContainerName : azureDbConfig.datasourcesContainerName)
     semanticCacheContainerName: (contains(azureDbConfig, 'semanticCacheContainerName') && !empty(azureDbConfig.semanticCacheContainerName) ? azureDbConfig.semanticCacheContainerName : _azureDbConfigDefaults.semanticCacheContainerName)
+    modelsContainerName: (contains(azureDbConfig, 'modelsContainerName') && !empty(azureDbConfig.modelsContainerName) ? azureDbConfig.modelsContainerName : _azureDbConfigDefaults.modelsContainerName)
+    feedbackContainerName: (contains(azureDbConfig, 'feedbackContainerName') && !empty(azureDbConfig.feedbackContainerName) ? azureDbConfig.feedbackContainerName : _azureDbConfigDefaults.feedbackContainerName)
 })
+
 var _cosmosDbResourceGroupName = _azureReuseConfig.cosmosDbReuse ? _azureReuseConfig.existingCosmosDbResourceGroupName : _resourceGroupName
 
 // App Insights Settings
@@ -729,6 +734,8 @@ module cosmosAccount './core/db/cosmos.bicep' = {
     conversationContainerName:  _azureDbConfig.conversationContainerName
     datasourcesContainerName: _azureDbConfig.datasourcesContainerName
     semanticCacheContainerName: _azureDbConfig.semanticCacheContainerName
+    modelsContainerName: _azureDbConfig.modelsContainerName
+    feedbackContainerName: _azureDbConfig.feedbackContainerName
     embeddingsVectorSize: _embeddingsVectorSize
     databaseName: _azureDbConfig.dbDatabaseName
     tags: tags
