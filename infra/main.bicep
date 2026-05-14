@@ -494,6 +494,25 @@ var _effectiveAppInsightsRG   = _provisionApplicationInsights ? _appInsightsReso
 param appServiceName string = ''
 var _appServiceName = _azureReuseConfig.appServiceReuse ? _azureReuseConfig.existingAppServiceName : !empty(appServiceName) ? appServiceName : 'webgpt0-${resourceToken}'
 
+@description('Teams bot App Service Name. Use your own name convention or leave as it is to generate a random name.')
+param teamsBotAppServiceName string = ''
+var _teamsBotAppServiceName = !empty(teamsBotAppServiceName) ? teamsBotAppServiceName : 'webteams0-${resourceToken}'
+
+@description('Teams bot User-Assigned Managed Identity name. Leave empty to generate a random name.')
+param teamsBotIdentityName string = ''
+var _teamsBotIdentityName = !empty(teamsBotIdentityName) ? teamsBotIdentityName : 'idteams0-${resourceToken}'
+
+@description('Azure Bot Service name for the Teams bot. Leave empty to generate a random name.')
+param teamsBotServiceName string = ''
+var _teamsBotServiceName = !empty(teamsBotServiceName) ? teamsBotServiceName : 'botteams0-${resourceToken}'
+
+@description('Display name shown in the Bot Framework / Teams for the Teams bot.')
+@maxLength(42)
+param teamsBotDisplayName string = 'GPT-RAG Teams Bot'
+
+@description('SKU for the Azure Bot Service used by the Teams bot.')
+param teamsBotServiceSku string = 'F0'
+
 @description('Load testing resource name. Use your own name convention or leave as it is to generate a random name.')
 param loadTestingName string = ''
 var _loadtestingName = !empty(loadTestingName) ? loadTestingName : 'loadtest0-${resourceToken}'
@@ -1178,6 +1197,52 @@ module appserviceKeyVaultAccess './core/security/keyvault-access.bicep' =  {
   }
 } 
 
+// Teams Bot App Service (hosted on the same App Service Plan as the front-end)
+
+module teamsBot './core/host/teamsbot.bicep' = {
+  name: 'teamsBot'
+  params: {
+    name: _teamsBotAppServiceName
+    identityName: _teamsBotIdentityName
+    location: location
+    tags: union(tags, { 'azd-service-name': 'teamsApp' })
+    appServicePlanId: appServicePlan.outputs.id
+    applicationInsightsName: _effectiveAppInsightsName
+    applicationInsightsResourceGroupName: _effectiveAppInsightsRG
+    orchestratorEndpoint: _orchestratorEndpoint
+    storageAccountName: _storageAccountName
+    storageContainerName: _storageContainerName
+    networkIsolation: (_networkIsolation && !_vnetReuse)
+    vnetName: (_networkIsolation && !_vnetReuse) ? vnet.outputs.name : ''
+    subnetId: (_networkIsolation && !_vnetReuse) ? vnet.outputs.appIntSubId : ''
+    basicPublishingCredentials: _networkIsolation ? true : false
+  }
+}
+
+module teamsBotRegistration './core/host/azurebot.bicep' = {
+  name: 'teamsBotRegistration'
+  params: {
+    botServiceName: _teamsBotServiceName
+    botDisplayName: teamsBotDisplayName
+    botServiceSku: teamsBotServiceSku
+    botAppDomain: teamsBot.outputs.defaultHostName
+    identityClientId: teamsBot.outputs.identityClientId
+    identityTenantId: teamsBot.outputs.identityTenantId
+    identityResourceId: teamsBot.outputs.identityId
+    tags: tags
+  }
+}
+
+// Grant the Teams bot UMI read access to the documents storage account.
+module teamsBotStorageAccountAccess './core/security/blobstorage-reader-access.bicep' = {
+  name: 'teamsbot-blobstorage-reader-access'
+  scope: az.resourceGroup(_storageAccountResourceGroupName)
+  params: {
+    resourceName: storage.outputs.name
+    principalId: teamsBot.outputs.identityPrincipalId
+  }
+}
+
 module dataIngestion './core/host/functions.bicep' = {
   name: 'dataIngestion'
   params: {
@@ -1756,6 +1821,10 @@ output AZURE_SPEECH_RECOGNITION_LANGUAGE string = _speechRecognitionLanguage
 output AZURE_STORAGE_ACCOUNT_PE string = _azureStorageAccountPe
 output AZURE_STORAGE_ACCOUNT_NAME string = _storageAccountName 
 output AZURE_STORAGE_CONTAINER_NAME string = _storageContainerName
+// commenting out to keep the number of outputs under 64
+// output AZURE_TEAMS_BOT_APP_SERVICE_NAME string = _teamsBotAppServiceName
+// output AZURE_TEAMS_BOT_SERVICE_NAME string = _teamsBotServiceName
+// output AZURE_TEAMS_BOT_IDENTITY_NAME string = _teamsBotIdentityName
 output AZURE_SUBSCRIPTION_ID string = subscription().subscriptionId
 output AZURE_TENANT_ID string = tenant().tenantId
 output AZURE_USE_SEMANTIC_RERANKING bool = _useSemanticReranking

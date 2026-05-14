@@ -44,6 +44,11 @@ services:
           run:  cd ../frontend;npm install;npm run build
           interactive: true
           continueOnError: false
+  teamsApp:
+    # project is temporally pulled from its repo during deployment.
+    project: ../gpt-rag-teams-DCS
+    language: ts
+    host: appservice
 hooks:
   prepackage:
     posix:
