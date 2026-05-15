@@ -7,6 +7,12 @@ param name string
 @description('Name of the User-Assigned Managed Identity used by the bot.')
 param identityName string
 
+@description('Set to true to reuse an existing User-Assigned Managed Identity instead of creating a new one.')
+param reuseExistingIdentity bool = false
+
+@description('Resource group containing the existing User-Assigned Managed Identity. Only used when reuseExistingIdentity is true.')
+param identityResourceGroupName string = resourceGroup().name
+
 param location string = resourceGroup().location
 param tags object = {}
 
@@ -38,11 +44,21 @@ param basicPublishingCredentials bool = false
 @description('Additional app settings to merge into the web app configuration.')
 param appSettings array = []
 
-resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+resource newIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = if (!reuseExistingIdentity) {
   name: identityName
   location: location
   tags: tags
 }
+
+resource existingIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = if (reuseExistingIdentity) {
+  scope: resourceGroup(identityResourceGroupName)
+  name: identityName
+}
+
+var identityId = reuseExistingIdentity ? existingIdentity.id : newIdentity.id
+var identityClientId = reuseExistingIdentity ? existingIdentity.properties.clientId : newIdentity.properties.clientId
+var identityTenantId = reuseExistingIdentity ? existingIdentity.properties.tenantId : newIdentity.properties.tenantId
+var identityPrincipalId = reuseExistingIdentity ? existingIdentity.properties.principalId : newIdentity.properties.principalId
 
 resource applicationInsights 'Microsoft.Insights/components@2020-02-02' existing = if (!empty(applicationInsightsName)) {
   scope: resourceGroup(applicationInsightsResourceGroupName)
@@ -57,7 +73,7 @@ resource webApp 'Microsoft.Web/sites@2022-09-01' = {
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
-      '${identity.id}': {}
+      '${identityId}': {}
     }
   }
   properties: {
@@ -79,15 +95,15 @@ resource webApp 'Microsoft.Web/sites@2022-09-01' = {
           }
           {
             name: 'CLIENT_ID'
-            value: identity.properties.clientId
+            value: identityClientId
           }
           {
             name: 'AZURE_CLIENT_ID'
-            value: identity.properties.clientId
+            value: identityClientId
           }
           {
             name: 'TENANT_ID'
-            value: identity.properties.tenantId
+            value: identityTenantId
           }
           {
             name: 'BOT_TYPE'
@@ -144,8 +160,8 @@ output name string = webApp.name
 output id string = webApp.id
 output uri string = 'https://${webApp.properties.defaultHostName}'
 output defaultHostName string = webApp.properties.defaultHostName
-output identityName string = identity.name
-output identityId string = identity.id
-output identityClientId string = identity.properties.clientId
-output identityPrincipalId string = identity.properties.principalId
-output identityTenantId string = identity.properties.tenantId
+output identityName string = identityName
+output identityId string = identityId
+output identityClientId string = identityClientId
+output identityPrincipalId string = identityPrincipalId
+output identityTenantId string = identityTenantId

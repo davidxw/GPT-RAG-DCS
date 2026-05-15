@@ -91,6 +91,9 @@ var _azureReuseConfigDefaults = {
   dataIngestionFunctionAppStorageReuse: false
   existingDataIngestionFunctionAppStorageName: ''
   existingDataIngestionFunctionAppStorageResourceGroupName: ''  
+  teamsBotIdentityReuse: false
+  existingTeamsBotIdentityResourceGroupName: ''
+  existingTeamsBotIdentityName: ''
 }
 
 param azureReuseConfig object = {} 
@@ -140,6 +143,9 @@ var _azureReuseConfig = union(_azureReuseConfigDefaults, {
     dataIngestionFunctionAppStorageReuse: (empty(azureReuseConfig.dataIngestionFunctionAppStorageReuse) ? _azureReuseConfigDefaults.dataIngestionFunctionAppStorageReuse : toLower(azureReuseConfig.dataIngestionFunctionAppStorageReuse) == 'true')
     existingDataIngestionFunctionAppStorageName: (empty(azureReuseConfig.existingDataIngestionFunctionAppStorageName) ? _azureReuseConfigDefaults.existingDataIngestionFunctionAppStorageName : azureReuseConfig.existingDataIngestionFunctionAppStorageName)
     existingDataIngestionFunctionAppStorageResourceGroupName: (empty(azureReuseConfig.existingDataIngestionFunctionAppStorageResourceGroupName) ? _azureReuseConfigDefaults.existingDataIngestionFunctionAppStorageResourceGroupName : azureReuseConfig.existingDataIngestionFunctionAppStorageResourceGroupName)
+    teamsBotIdentityReuse: (empty(azureReuseConfig.teamsBotIdentityReuse) ? _azureReuseConfigDefaults.teamsBotIdentityReuse : toLower(azureReuseConfig.teamsBotIdentityReuse) == 'true')
+    existingTeamsBotIdentityResourceGroupName: (empty(azureReuseConfig.existingTeamsBotIdentityResourceGroupName) ? _azureReuseConfigDefaults.existingTeamsBotIdentityResourceGroupName : azureReuseConfig.existingTeamsBotIdentityResourceGroupName)
+    existingTeamsBotIdentityName: (empty(azureReuseConfig.existingTeamsBotIdentityName) ? _azureReuseConfigDefaults.existingTeamsBotIdentityName : azureReuseConfig.existingTeamsBotIdentityName)
   }
 )
 
@@ -500,7 +506,8 @@ var _teamsBotAppServiceName = !empty(teamsBotAppServiceName) ? teamsBotAppServic
 
 @description('Teams bot User-Assigned Managed Identity name. Leave empty to generate a random name.')
 param teamsBotIdentityName string = ''
-var _teamsBotIdentityName = !empty(teamsBotIdentityName) ? teamsBotIdentityName : 'idteams0-${resourceToken}'
+var _teamsBotIdentityName = _azureReuseConfig.teamsBotIdentityReuse ? _azureReuseConfig.existingTeamsBotIdentityName : !empty(teamsBotIdentityName) ? teamsBotIdentityName : 'idteams0-${resourceToken}'
+var _teamsBotIdentityResourceGroupName = _azureReuseConfig.teamsBotIdentityReuse ? _azureReuseConfig.existingTeamsBotIdentityResourceGroupName : _resourceGroupName
 
 @description('Azure Bot Service name for the Teams bot. Leave empty to generate a random name.')
 param teamsBotServiceName string = ''
@@ -1204,6 +1211,8 @@ module teamsBot './core/host/teamsbot.bicep' = {
   params: {
     name: _teamsBotAppServiceName
     identityName: _teamsBotIdentityName
+    identityResourceGroupName: _teamsBotIdentityResourceGroupName
+    reuseExistingIdentity: _azureReuseConfig.teamsBotIdentityReuse
     location: location
     tags: union(tags, { 'azd-service-name': 'teamsApp' })
     appServicePlanId: appServicePlan.outputs.id
