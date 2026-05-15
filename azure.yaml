@@ -6,26 +6,32 @@ metadata:
 services:
   dataIngest:
     # project is temporally pulled fro its repo during deployment.
-    project: ../gpt-rag-ingestion
+    project: ../gpt-rag-ingestion-DCS
     language: python
     host: function
+    config:
+      remoteBuild: true
     hooks:
       postdeploy:
         posix:
-          # this path is relative to ./.azure/gpt-rag-ingestion
+          shell: sh
+          workingDir: ../gpt-rag-ingestion-DCS
           run: scripts/postdeploy.sh
           interactive: true
         windows:
-          # this path is relative to ./.azure/gpt-rag-ingestion
+          shell: pwsh
+          workingDir: ../gpt-rag-ingestion-DCS
           run: scripts/postdeploy.ps1
           interactive: true
   orchestrator:
-    project: ../gpt-rag-orchestrator
+    project: ../gpt-rag-orchestrator-DCS
     language: python
     host: function
+    config:
+      remoteBuild: true
   frontend:
     # backend is python and frontend is Vite app. The frontend is built with Vite settings to output into the backend's static folder.
-    project: ../gpt-rag-frontend/backend
+    project: ../gpt-rag-frontend-DCS/backend
     language: python
     host: appservice
     hooks:
@@ -40,6 +46,11 @@ services:
           run:  cd ../frontend;npm install;npm run build
           interactive: true
           continueOnError: false
+  teamsApp:
+    # project is temporally pulled from its repo during deployment.
+    project: ../gpt-rag-teams-DCS
+    language: ts
+    host: appservice
 hooks:
   prepackage:
     posix:

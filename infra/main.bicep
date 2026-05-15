@@ -91,6 +91,9 @@ var _azureReuseConfigDefaults = {
   dataIngestionFunctionAppStorageReuse: false
   existingDataIngestionFunctionAppStorageName: ''
   existingDataIngestionFunctionAppStorageResourceGroupName: ''  
+  teamsBotIdentityReuse: false
+  existingTeamsBotIdentityResourceGroupName: ''
+  existingTeamsBotIdentityName: ''
 }
 
 param azureReuseConfig object = {} 
@@ -140,6 +143,9 @@ var _azureReuseConfig = union(_azureReuseConfigDefaults, {
     dataIngestionFunctionAppStorageReuse: (empty(azureReuseConfig.dataIngestionFunctionAppStorageReuse) ? _azureReuseConfigDefaults.dataIngestionFunctionAppStorageReuse : toLower(azureReuseConfig.dataIngestionFunctionAppStorageReuse) == 'true')
     existingDataIngestionFunctionAppStorageName: (empty(azureReuseConfig.existingDataIngestionFunctionAppStorageName) ? _azureReuseConfigDefaults.existingDataIngestionFunctionAppStorageName : azureReuseConfig.existingDataIngestionFunctionAppStorageName)
     existingDataIngestionFunctionAppStorageResourceGroupName: (empty(azureReuseConfig.existingDataIngestionFunctionAppStorageResourceGroupName) ? _azureReuseConfigDefaults.existingDataIngestionFunctionAppStorageResourceGroupName : azureReuseConfig.existingDataIngestionFunctionAppStorageResourceGroupName)
+    teamsBotIdentityReuse: (empty(azureReuseConfig.teamsBotIdentityReuse) ? _azureReuseConfigDefaults.teamsBotIdentityReuse : toLower(azureReuseConfig.teamsBotIdentityReuse) == 'true')
+    existingTeamsBotIdentityResourceGroupName: (empty(azureReuseConfig.existingTeamsBotIdentityResourceGroupName) ? _azureReuseConfigDefaults.existingTeamsBotIdentityResourceGroupName : azureReuseConfig.existingTeamsBotIdentityResourceGroupName)
+    existingTeamsBotIdentityName: (empty(azureReuseConfig.existingTeamsBotIdentityName) ? _azureReuseConfigDefaults.existingTeamsBotIdentityName : azureReuseConfig.existingTeamsBotIdentityName)
   }
 )
 
@@ -245,6 +251,8 @@ var _azureDbConfigDefaults = {
   conversationContainerName: 'conversations'
   datasourcesContainerName: 'datasources'
   semanticCacheContainerName: 'semantic_cache'
+  modelsContainerName: 'models'
+  feedbackContainerName: 'feedback'
 }
 param azureDbConfig object = {} 
 var _azureDbConfig = union(_azureDbConfigDefaults, {
@@ -253,7 +261,10 @@ var _azureDbConfig = union(_azureDbConfigDefaults, {
     conversationContainerName: (empty(azureDbConfig.conversationContainerName) ? _azureDbConfigDefaults.conversationContainerName : azureDbConfig.conversationContainerName)
     datasourcesContainerName: (empty(azureDbConfig.datasourcesContainerName) ? _azureDbConfigDefaults.datasourcesContainerName : azureDbConfig.datasourcesContainerName)
     semanticCacheContainerName: (contains(azureDbConfig, 'semanticCacheContainerName') && !empty(azureDbConfig.semanticCacheContainerName) ? azureDbConfig.semanticCacheContainerName : _azureDbConfigDefaults.semanticCacheContainerName)
+    modelsContainerName: (contains(azureDbConfig, 'modelsContainerName') && !empty(azureDbConfig.modelsContainerName) ? azureDbConfig.modelsContainerName : _azureDbConfigDefaults.modelsContainerName)
+    feedbackContainerName: (contains(azureDbConfig, 'feedbackContainerName') && !empty(azureDbConfig.feedbackContainerName) ? azureDbConfig.feedbackContainerName : _azureDbConfigDefaults.feedbackContainerName)
 })
+
 var _cosmosDbResourceGroupName = _azureReuseConfig.cosmosDbReuse ? _azureReuseConfig.existingCosmosDbResourceGroupName : _resourceGroupName
 
 // App Insights Settings
@@ -488,6 +499,26 @@ var _effectiveAppInsightsRG   = _provisionApplicationInsights ? _appInsightsReso
 @description('Front-end App Service Name. Use your own name convention or leave as it is to generate a random name.')
 param appServiceName string = ''
 var _appServiceName = _azureReuseConfig.appServiceReuse ? _azureReuseConfig.existingAppServiceName : !empty(appServiceName) ? appServiceName : 'webgpt0-${resourceToken}'
+
+@description('Teams bot App Service Name. Use your own name convention or leave as it is to generate a random name.')
+param teamsBotAppServiceName string = ''
+var _teamsBotAppServiceName = !empty(teamsBotAppServiceName) ? teamsBotAppServiceName : 'webteams0-${resourceToken}'
+
+@description('Teams bot User-Assigned Managed Identity name. Leave empty to generate a random name.')
+param teamsBotIdentityName string = ''
+var _teamsBotIdentityName = _azureReuseConfig.teamsBotIdentityReuse ? _azureReuseConfig.existingTeamsBotIdentityName : !empty(teamsBotIdentityName) ? teamsBotIdentityName : 'idteams0-${resourceToken}'
+var _teamsBotIdentityResourceGroupName = _azureReuseConfig.teamsBotIdentityReuse ? _azureReuseConfig.existingTeamsBotIdentityResourceGroupName : _resourceGroupName
+
+@description('Azure Bot Service name for the Teams bot. Leave empty to generate a random name.')
+param teamsBotServiceName string = ''
+var _teamsBotServiceName = !empty(teamsBotServiceName) ? teamsBotServiceName : 'botteams0-${resourceToken}'
+
+@description('Display name shown in the Bot Framework / Teams for the Teams bot.')
+@maxLength(42)
+param teamsBotDisplayName string = 'GPT-RAG Teams Bot'
+
+@description('SKU for the Azure Bot Service used by the Teams bot.')
+param teamsBotServiceSku string = 'F0'
 
 @description('Load testing resource name. Use your own name convention or leave as it is to generate a random name.')
 param loadTestingName string = ''
@@ -729,6 +760,8 @@ module cosmosAccount './core/db/cosmos.bicep' = {
     conversationContainerName:  _azureDbConfig.conversationContainerName
     datasourcesContainerName: _azureDbConfig.datasourcesContainerName
     semanticCacheContainerName: _azureDbConfig.semanticCacheContainerName
+    modelsContainerName: _azureDbConfig.modelsContainerName
+    feedbackContainerName: _azureDbConfig.feedbackContainerName
     embeddingsVectorSize: _embeddingsVectorSize
     databaseName: _azureDbConfig.dbDatabaseName
     tags: tags
@@ -1170,6 +1203,78 @@ module appserviceKeyVaultAccess './core/security/keyvault-access.bicep' =  {
     principalId: frontEnd.outputs.identityPrincipalId
   }
 } 
+
+// Teams Bot App Service (hosted on the same App Service Plan as the front-end)
+
+module teamsBot './core/host/teamsbot.bicep' = {
+  name: 'teamsBot'
+  params: {
+    name: _teamsBotAppServiceName
+    identityName: _teamsBotIdentityName
+    identityResourceGroupName: _teamsBotIdentityResourceGroupName
+    reuseExistingIdentity: _azureReuseConfig.teamsBotIdentityReuse
+    location: location
+    tags: union(tags, { 'azd-service-name': 'teamsApp' })
+    appServicePlanId: appServicePlan.outputs.id
+    applicationInsightsName: _effectiveAppInsightsName
+    applicationInsightsResourceGroupName: _effectiveAppInsightsRG
+    orchestratorEndpoint: _orchestratorEndpoint
+    storageAccountName: _storageAccountName
+    storageContainerName: _storageContainerName
+    networkIsolation: (_networkIsolation && !_vnetReuse)
+    vnetName: (_networkIsolation && !_vnetReuse) ? vnet.outputs.name : ''
+    subnetId: (_networkIsolation && !_vnetReuse) ? vnet.outputs.appIntSubId : ''
+    basicPublishingCredentials: _networkIsolation ? true : false
+    appSettings: [
+      {
+        name: 'AZURE_SUBSCRIPTION_ID'
+        value: subscription().subscriptionId
+      }
+      {
+        name: 'AZURE_RESOURCE_GROUP_NAME'
+        value: _resourceGroupName
+      }
+      {
+        name: 'AZURE_ORCHESTRATOR_FUNC_NAME'
+        value: _orchestratorFunctionAppName
+      }
+    ]
+  }
+}
+
+module teamsBotRegistration './core/host/azurebot.bicep' = {
+  name: 'teamsBotRegistration'
+  params: {
+    botServiceName: _teamsBotServiceName
+    botDisplayName: teamsBotDisplayName
+    botServiceSku: teamsBotServiceSku
+    botAppDomain: teamsBot.outputs.defaultHostName
+    identityClientId: teamsBot.outputs.identityClientId
+    identityTenantId: teamsBot.outputs.identityTenantId
+    identityResourceId: teamsBot.outputs.identityId
+    tags: tags
+  }
+}
+
+// Grant the Teams bot UMI read access to the documents storage account.
+module teamsBotStorageAccountAccess './core/security/blobstorage-reader-access.bicep' = {
+  name: 'teamsbot-blobstorage-reader-access'
+  scope: az.resourceGroup(_storageAccountResourceGroupName)
+  params: {
+    resourceName: storage.outputs.name
+    principalId: teamsBot.outputs.identityPrincipalId
+  }
+}
+
+// Grant the Teams bot UMI Contributor on the orchestrator Function App.
+module teamsBotOrchestratorAccess './core/security/functions-access.bicep' = {
+  name: 'teamsbot-function-access'
+  scope: az.resourceGroup(_orchestratorFunctionAppResourceGroupName)
+  params: {
+    resourceName: orchestrator.outputs.name
+    principalId: teamsBot.outputs.identityPrincipalId
+  }
+}
 
 module dataIngestion './core/host/functions.bicep' = {
   name: 'dataIngestion'
@@ -1749,6 +1854,10 @@ output AZURE_SPEECH_RECOGNITION_LANGUAGE string = _speechRecognitionLanguage
 output AZURE_STORAGE_ACCOUNT_PE string = _azureStorageAccountPe
 output AZURE_STORAGE_ACCOUNT_NAME string = _storageAccountName 
 output AZURE_STORAGE_CONTAINER_NAME string = _storageContainerName
+// commenting out to keep the number of outputs under 64
+// output AZURE_TEAMS_BOT_APP_SERVICE_NAME string = _teamsBotAppServiceName
+// output AZURE_TEAMS_BOT_SERVICE_NAME string = _teamsBotServiceName
+// output AZURE_TEAMS_BOT_IDENTITY_NAME string = _teamsBotIdentityName
 output AZURE_SUBSCRIPTION_ID string = subscription().subscriptionId
 output AZURE_TENANT_ID string = tenant().tenantId
 output AZURE_USE_SEMANTIC_RERANKING bool = _useSemanticReranking

@@ -1,4 +1,4 @@
-# Delete the gpt-rag-ingestion folder from .azure if it exists
+Delete the gpt-rag-ingestion folder from .azure if it exists
 if (Test-Path -Path ".\.azure\gpt-rag-ingestion") {
     Remove-Item -Path ".\.azure\gpt-rag-ingestion" -Recurse -Force
 }

@@ -12,7 +12,7 @@
         "value": "${AZURE_PRINCIPAL_ID}"
       },
       "resourceGroupName": {
-        "value": "${AZURE_RESOURCE_GROUP_NAME}"
+        "value": "${AZURE_RESOURCE_GROUP}"
       },
       "networkIsolation": {
         "value": "${AZURE_NETWORK_ISOLATION}"
@@ -115,6 +115,9 @@
       },
       "chatGptSmallDeploymentCapacity": {
         "value": "${AZURE_CHAT_GPT_SMALL_DEPLOYMENT_CAPACITY}"
+      },
+      "disableLocalAuth": {
+        "value": "${AZURE_DISABLE_LOCAL_AUTH}"
       },
       "embeddingsModelName": {
         "value": "${AZURE_EMBEDDINGS_MODEL_NAME}"
